@@ -15,7 +15,6 @@ _fzf_compgen_dir() {
   fd --type=d --hidden --exclude .git . "$1"
 }
 
-source ~/fzf-git.sh/fzf-git.sh
 export FZF_CTRL_T_OPTS="--preview 'bat -n --color=always --line-range :500 {}'"
 
 export ITEM_DIR="/Users/noetrevino/.config/sketchybar/items"
@@ -60,4 +59,4 @@ alias gr='function _gr() { if [[ "$1" =~ ^[0-9]+$ ]]; then git rebase -i HEAD~$1
 alias g='git'
 alias n='clear && neofetch'
 
-source ./fzf-git.sh/fzf-git.sh
+source ~/terminal-setup/fzf-git.sh/fzf-git.sh
