@@ -49,7 +49,6 @@ alias t='tmux-list'
 # ---- Zoxide (better cd) ----
 eval "$(zoxide init zsh)"
 
-alias cd="z"
 export PATH="$HOME/.cargo/bin:$PATH"
 # Git log oneline
 alias l="git log --oneline"
