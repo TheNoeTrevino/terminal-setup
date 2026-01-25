@@ -85,6 +85,12 @@ fzf_sps_widget() {
 }
 zle -N fzf_sps_widget
 
+fg_sps_widget() {
+  fg
+}
+zle -N fg_sps_widget
+
 bindkey '^P' fzf_sps_widget
+bindkey '^Z' fg_sps_widget
 
 source ~/terminal-setup/fzf-git.sh/fzf-git.sh
