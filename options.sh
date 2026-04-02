@@ -3,6 +3,8 @@ export FZF_DEFAULT_COMMAND="fd --hidden --strip-cwd-prefix --exclude .git"
 export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 export FZF_DEFAULT_OPTS='--bind ctrl-k:down,ctrl-l:up'
 
+export CLAUDE_CODE_NO_FLICKER=1
+
 export EDITOR='nvim'
 eval "$(fzf --zsh)"
 
