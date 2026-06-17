@@ -74,6 +74,7 @@ alias gr='function _gr() { if [[ "$1" =~ ^[0-9]+$ ]]; then git rebase -i HEAD~$1
 alias g='git'
 alias n='clear && neofetch'
 
+# TODO: what does this do?
 sps() {
   ps -ef | fzf --bind 'ctrl-r:reload(ps -ef)' \
     --header 'Press CTRL-R to reload' \
@@ -91,6 +92,13 @@ fg_sps_widget() {
   fg
 }
 zle -N fg_sps_widget
+
+# TODO: make this a widget
+fjob() {
+  local job
+  job=$(jobs | fzf | awk '{print $1}' | tr -d '[]')
+  [[ -n "$job" ]] && fg "%$job"
+}
 
 bindkey '^P' fzf_sps_widget
 bindkey '^Z' fg_sps_widget
