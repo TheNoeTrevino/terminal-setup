@@ -95,4 +95,17 @@ zle -N fg_sps_widget
 bindkey '^P' fzf_sps_widget
 bindkey '^Z' fg_sps_widget
 
+bindkey -M vicmd 'j' vi-backward-char     # was h (left)
+bindkey -M vicmd 'k' down-line-or-history # was j (down)
+bindkey -M vicmd 'l' up-line-or-history   # was k (up)
+bindkey -M vicmd ';' vi-forward-char      # was l (right)
+
+bindkey -M visual 'j' vi-backward-char
+bindkey -M visual 'k' down-line-or-history
+bindkey -M visual 'l' up-line-or-history
+bindkey -M visual ';' vi-forward-char
+
+bindkey -M viins '^[[1;5D' backward-word # your Alt+Left
+bindkey -M viins '^[[1;5C' forward-word  # Alt+Right (verify with cat -v)
+
 source ~/terminal-setup/fzf-git.sh/fzf-git.sh
