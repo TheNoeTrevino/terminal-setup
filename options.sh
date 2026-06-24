@@ -133,19 +133,14 @@ alias gr='function _gr() { if [[ "$1" =~ ^[0-9]+$ ]]; then git rebase -i HEAD~$1
 alias g='git'
 alias n='clear && neofetch'
 
-# ---- Television git pickers (replaces fzf-git.sh) ----
-# Each channel ships its own actions; run them inside a git repo:
-#   gb   git-branch  enter=checkout  ctrl-d=delete  ctrl-m=merge  ctrl-r=rebase
-#   gf   git-files   f12=edit in $EDITOR
-#   glo  git-log     ctrl-y=cherry-pick  ctrl-r=revert  ctrl-o=checkout
-#   gst  git-stash   enter=apply  ctrl-p=pop  ctrl-d=drop
-#   gtag git-tags    enter=checkout  ctrl-d=delete
-# Press ctrl-x inside any channel to see/run all available actions.
-alias gb='tv git-branch'
-alias gf='tv git-files'
-alias glo='tv git-log'
-alias gst='tv git-stash'
-alias gtag='tv git-tags'
+# ---- Git pickers: fzf-git.sh (Ctrl-G chords) ----
+# tv is the fuzzy finder for everything EXCEPT git. For git we use junegunn's
+# fzf-git.sh: each Ctrl-G chord opens an fzf picker and inserts the selected
+# object at the cursor. It only binds ^G (in viins/vicmd), so tv's ^T/^R/^F and
+# all other pickers are untouched. Needs the `fzf` binary (installed).
+#   ^G^F files    ^G^B branches  ^G^T tags      ^G^R remotes    ^G^H hashes
+#   ^G^S stashes  ^G^L reflogs   ^G^E each-ref  ^G^W worktrees   (^G^? lists all)
+source ~/terminal-setup/fzf-git.sh/fzf-git.sh
 
 # ---- Process picker ----
 # Was: sps() { ps -ef | fzf ... } bound to ^P.
