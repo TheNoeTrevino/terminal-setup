@@ -18,30 +18,56 @@ autoload -Uz compinit && compinit
 # (command history) -- the television equivalents of fzf's ^T / ^R. Which
 # channel a given command opens (e.g. `git checkout` + ^T -> git-branch) is
 # configured under [shell_integration] in config.toml.
-eval "$(tv init zsh)"
+_tv_cache="${XDG_CACHE_HOME:-$HOME/.cache}/tv_init.zsh"
+if [[ ! -f "$_tv_cache" || $(which tv) -nt "$_tv_cache" ]]; then
+  tv init zsh >| "$_tv_cache"
+fi
+source "$_tv_cache"
+unset _tv_cache
 
 # tv's smart-autocomplete widget, on an EMPTY line, falls back to zsh's default
-# completion -- the "do you wish to see all 4290 possibilities" dump. It reads the
-# `fzf_default_completion` variable to override that fallback, so point it at a
-# widget that just opens tv and inserts the pick onto the line.
+# completion -- the "do you wish to see all 4290 possibilities" dump. We want an
+# empty line to open tv instead.
+#
+# This used to be done with `fzf_default_completion=_tv_open`, but that variable
+# is GLOBAL: fzf's completion.zsh (which binds <Tab> to `fzf-completion`) reads
+# the same variable as its fallback. On any machine where fzf's shell
+# integration is loaded, that made <Tab> open tv. We now scope the behaviour to
+# our own wrapper widget below and leave <Tab> as plain zsh completion.
 _tv_open() {
   local result
-  result=$(tv < /dev/tty)
+  result=$(tv </dev/tty)
   [[ -n "$result" ]] && LBUFFER="${LBUFFER}${result}"
   typeset -f _enable_bracketed_paste >/dev/null && _enable_bracketed_paste
   zle reset-prompt
 }
 zle -N _tv_open
-fzf_default_completion=_tv_open
 
-# Ctrl-F (in addition to the ^T tv init binds) triggers smart autocomplete: with a
-# command typed it completes the current token context-aware (e.g. `git checkout `
-# -> branches); on an empty line it now opens tv via the fallback above. Bound in
-# viins/vicmd since EDITOR=nvim puts zsh in vi mode.
-bindkey -M viins '^F' tv-smart-autocomplete
-bindkey -M vicmd '^F' tv-smart-autocomplete
+# Empty line -> open tv outright; otherwise run tv's context-aware smart
+# autocomplete (e.g. `git checkout ` -> branches).
+_tv_smart_or_open() {
+  if [[ -z "${LBUFFER//[[:space:]]/}" ]]; then
+    _tv_open
+  else
+    zle tv-smart-autocomplete
+  fi
+}
+zle -N _tv_smart_or_open
 
-eval "$(starship init zsh)"
+# Ctrl-F / Ctrl-T trigger smart autocomplete. Bound in viins/vicmd since
+# EDITOR=nvim puts zsh in vi mode. <Tab> is intentionally left untouched so it
+# keeps doing normal zsh completion.
+bindkey -M viins '^F' _tv_smart_or_open
+bindkey -M vicmd '^F' _tv_smart_or_open
+bindkey -M viins '^T' _tv_smart_or_open
+bindkey -M vicmd '^T' _tv_smart_or_open
+
+_starship_cache="${XDG_CACHE_HOME:-$HOME/.cache}/starship_init.zsh"
+if [[ ! -f "$_starship_cache" || $(which starship) -nt "$_starship_cache" ]]; then
+  starship init zsh >| "$_starship_cache"
+fi
+source "$_starship_cache"
+unset _starship_cache
 
 export ITEM_DIR="/Users/noetrevino/.config/sketchybar/items"
 
@@ -91,7 +117,12 @@ tmux-kill() {
 alias t='tmux-list'
 
 # ---- Zoxide (better cd) ----
-eval "$(zoxide init zsh)"
+_zoxide_cache="${XDG_CACHE_HOME:-$HOME/.cache}/zoxide_init.zsh"
+if [[ ! -f "$_zoxide_cache" || $(which zoxide) -nt "$_zoxide_cache" ]]; then
+  zoxide init zsh >| "$_zoxide_cache"
+fi
+source "$_zoxide_cache"
+unset _zoxide_cache
 
 export PATH="$HOME/.cargo/bin:$PATH"
 
@@ -154,3 +185,13 @@ bindkey -M visual ';' vi-forward-char
 
 bindkey -M viins '^[[1;5D' backward-word # Alt+Left
 bindkey -M viins '^[[1;5C' forward-word  # Alt+Right (verify with cat -v)
+
+alias claude='claude --dangerously-skip-permissions'
+
+# ---- Reload config ----
+# Use this instead of `source ~/.zshrc`. Re-sourcing re-runs compinit + re-binds
+# ^T/^R/^F/^P *while the line editor is live*; during that ~0.8s window stray
+# terminal input lands on the freshly-rebound keys and fires tv pickers (which
+# then open $EDITOR via their f12 action). `exec zsh` replaces the shell so the
+# config loads cleanly before zle is interactive, and picks up all changes.
+alias reload='exec zsh'
