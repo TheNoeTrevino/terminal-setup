@@ -20,7 +20,7 @@ autoload -Uz compinit && compinit
 # configured under [shell_integration] in config.toml.
 _tv_cache="${XDG_CACHE_HOME:-$HOME/.cache}/tv_init.zsh"
 if [[ ! -f "$_tv_cache" || $(which tv) -nt "$_tv_cache" ]]; then
-  tv init zsh >| "$_tv_cache"
+  tv init zsh >|"$_tv_cache"
 fi
 source "$_tv_cache"
 unset _tv_cache
@@ -64,7 +64,7 @@ bindkey -M vicmd '^T' _tv_smart_or_open
 
 _starship_cache="${XDG_CACHE_HOME:-$HOME/.cache}/starship_init.zsh"
 if [[ ! -f "$_starship_cache" || $(which starship) -nt "$_starship_cache" ]]; then
-  starship init zsh >| "$_starship_cache"
+  starship init zsh >|"$_starship_cache"
 fi
 source "$_starship_cache"
 unset _starship_cache
@@ -119,7 +119,7 @@ alias t='tmux-list'
 # ---- Zoxide (better cd) ----
 _zoxide_cache="${XDG_CACHE_HOME:-$HOME/.cache}/zoxide_init.zsh"
 if [[ ! -f "$_zoxide_cache" || $(which zoxide) -nt "$_zoxide_cache" ]]; then
-  zoxide init zsh >| "$_zoxide_cache"
+  zoxide init zsh >|"$_zoxide_cache"
 fi
 source "$_zoxide_cache"
 unset _zoxide_cache
@@ -190,3 +190,6 @@ alias claude='claude --dangerously-skip-permissions'
 # then open $EDITOR via their f12 action). `exec zsh` replaces the shell so the
 # config loads cleanly before zle is interactive, and picks up all changes.
 alias reload='exec zsh'
+
+# remove lag from going into vi mode in shell
+export KEYTIMEOUT=1
