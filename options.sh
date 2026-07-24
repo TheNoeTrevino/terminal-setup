@@ -54,9 +54,9 @@ _tv_smart_or_open() {
 }
 zle -N _tv_smart_or_open
 
-# Ctrl-F / Ctrl-T trigger smart autocomplete. Bound in viins/vicmd since
-# EDITOR=nvim puts zsh in vi mode. <Tab> is intentionally left untouched so it
-# keeps doing normal zsh completion.
+# Ctrl-F / Ctrl-T trigger smart autocomplete. Bound in viins/vicmd since the
+# shell runs in vi mode (bindkey -v in .zshrc). <Tab> is intentionally left
+# untouched so it keeps doing normal zsh completion.
 bindkey -M viins '^F' _tv_smart_or_open
 bindkey -M vicmd '^F' _tv_smart_or_open
 bindkey -M viins '^T' _tv_smart_or_open
@@ -192,4 +192,4 @@ alias claude='claude --dangerously-skip-permissions'
 alias reload='exec zsh'
 
 # remove lag from going into vi mode in shell
-export KEYTIMEOUT=1
+export KEYTIMEOUT=15
