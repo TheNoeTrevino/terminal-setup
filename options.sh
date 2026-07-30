@@ -71,8 +71,18 @@ unset _starship_cache
 
 export ITEM_DIR="/Users/noetrevino/.config/sketchybar/items"
 
+# ---- Interactive-only aliases ----
+# This file is sourced by non-interactive shells too (scripts, `zsh -c`, agents
+# and other tooling that loads the profile). Aliases are still expanded there,
+# so things like `ls` -> eza or `claude` -> --dangerously-skip-permissions leak
+# into automation and break scripts that expect the real command. Use `ialias`
+# instead of `alias` for anything that's purely a typing shortcut; it's a no-op
+# unless the shell is interactive. Functions below are left unguarded on
+# purpose -- they're new names, not overrides.
+ialias() { [[ -o interactive ]] && alias "$@"; return 0; }
+
 # ---- Eza (better ls) -----
-alias ls="eza --icons=always --color=always --long  --no-filesize --no-time --no-user --no-permissions"
+ialias ls="eza --icons=always --color=always --long  --no-filesize --no-time --no-user --no-permissions"
 
 # ---- Fuzzy-find a file and open it in nvim ----
 # Was: fd | fzf-tmux --preview 'bat ...' | xargs nvim
@@ -114,7 +124,7 @@ tmux-kill() {
   [[ -n "$session" ]] && tmux kill-session -t "$session"
 }
 
-alias t='tmux-list'
+ialias t='tmux-list'
 
 # ---- Zoxide (better cd) ----
 _zoxide_cache="${XDG_CACHE_HOME:-$HOME/.cache}/zoxide_init.zsh"
@@ -127,11 +137,11 @@ unset _zoxide_cache
 export PATH="$HOME/.cargo/bin:$PATH"
 
 # ---- Git aliases ----
-alias l="git log --oneline"
-alias lg="lazygit"
-alias gr='function _gr() { if [[ "$1" =~ ^[0-9]+$ ]]; then git rebase -i HEAD~$1; else git rebase -i $1; fi; }; _gr'
-alias g='git'
-alias n='clear && neofetch'
+ialias l="git log --oneline"
+ialias lg="lazygit"
+ialias gr='function _gr() { if [[ "$1" =~ ^[0-9]+$ ]]; then git rebase -i HEAD~$1; else git rebase -i $1; fi; }; _gr'
+ialias g='git'
+ialias n='clear && neofetch'
 
 # ---- Git pickers: fzf-git.sh (Ctrl-G chords) ----
 # tv is the fuzzy finder for everything EXCEPT git. For git we use junegunn's
@@ -146,7 +156,7 @@ source ~/terminal-setup/fzf-git.sh/fzf-git.sh
 # Was: sps() { ps -ef | fzf ... } bound to ^P.
 # The procs channel can act on the selection: F3=kill, F2=term, ctrl-s=stop,
 # ctrl-c=cont. `sps` kept as an alias for muscle memory.
-alias sps='tv procs'
+ialias sps='tv procs'
 _tv_procs_widget() {
   tv procs >/dev/null
   zle reset-prompt
@@ -181,7 +191,7 @@ bindkey -M visual ';' vi-forward-char
 bindkey -M viins '^[[1;5D' backward-word # Alt+Left
 bindkey -M viins '^[[1;5C' forward-word  # Alt+Right (verify with cat -v)
 
-alias claude='claude --dangerously-skip-permissions'
+ialias claude='claude --dangerously-skip-permissions'
 
 # ---- Reload config ----
 # Use this instead of `source ~/.zshrc`. Re-sourcing re-runs compinit + re-binds
@@ -189,7 +199,7 @@ alias claude='claude --dangerously-skip-permissions'
 # terminal input lands on the freshly-rebound keys and fires tv pickers (which
 # then open $EDITOR via their f12 action). `exec zsh` replaces the shell so the
 # config loads cleanly before zle is interactive, and picks up all changes.
-alias reload='exec zsh'
+ialias reload='exec zsh'
 
 # remove lag from going into vi mode in shell
 export KEYTIMEOUT=15
