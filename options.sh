@@ -5,7 +5,9 @@
 # fzf is still installed as a fallback but nothing here depends on it.
 # ---------------------------------------------------------------------------
 
+# claude code options
 export CLAUDE_CODE_NO_FLICKER=1
+
 export EDITOR='nvim'
 
 # ---- Command history ----
