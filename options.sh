@@ -8,6 +8,25 @@
 export CLAUDE_CODE_NO_FLICKER=1
 export EDITOR='nvim'
 
+# ---- Command history ----
+# zsh ships with no HISTFILE and SAVEHIST=0, so history was in-memory only and
+# capped at 30 lines -- every new terminal started blank. tv's ^R widget reads
+# the *in-memory* list (`history -n -1 0`), so persistence has to happen here,
+# not in tv's config.
+HISTFILE="$HOME/.zsh_history"
+HISTSIZE=100000   # lines kept in memory (what ^R searches)
+SAVEHIST=100000   # lines written to HISTFILE
+
+# share_history: write each command out immediately AND pull in commands other
+# live sessions have written, so ^R in one terminal sees what you typed in
+# another. Implies append_history, inc_append_history and extended_history.
+setopt share_history
+setopt extended_history      # record timestamp + duration per entry
+setopt hist_ignore_all_dups  # drop the older copy when a command repeats
+setopt hist_ignore_space     # leading space keeps a command out of history
+setopt hist_reduce_blanks    # tidy up whitespace before storing
+setopt hist_verify           # expansions land on the line for review, not run
+
 # Initialize zsh's completion system. tv's init script registers a completion
 # (`compdef _tv tv`), which requires compinit to have run first -- otherwise
 # sourcing prints "command not found: compdef". (fzf's script guarded this; tv's
