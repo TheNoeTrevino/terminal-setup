@@ -79,7 +79,10 @@ export ITEM_DIR="/Users/noetrevino/.config/sketchybar/items"
 # instead of `alias` for anything that's purely a typing shortcut; it's a no-op
 # unless the shell is interactive. Functions below are left unguarded on
 # purpose -- they're new names, not overrides.
-ialias() { [[ -o interactive ]] && alias "$@"; return 0; }
+ialias() {
+  [[ -o interactive ]] && alias "$@"
+  return 0
+}
 
 # ---- Eza (better ls) -----
 ialias ls="eza --icons=always --color=always --long  --no-filesize --no-time --no-user --no-permissions"
