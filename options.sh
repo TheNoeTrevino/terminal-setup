@@ -201,17 +201,6 @@ fjob() {
 bindkey '^P' _tv_procs_widget
 bindkey '^Z' _tv_fg_widget
 
-# ---- vi-mode navigation remap (j=left, k=down, l=up, ;=right) ----
-bindkey -M vicmd 'j' vi-backward-char     # was h (left)
-bindkey -M vicmd 'k' down-line-or-history # was j (down)
-bindkey -M vicmd 'l' up-line-or-history   # was k (up)
-bindkey -M vicmd ';' vi-forward-char      # was l (right)
-
-bindkey -M visual 'j' vi-backward-char
-bindkey -M visual 'k' down-line-or-history
-bindkey -M visual 'l' up-line-or-history
-bindkey -M visual ';' vi-forward-char
-
 bindkey -M viins '^[[1;5D' backward-word # Alt+Left
 bindkey -M viins '^[[1;5C' forward-word  # Alt+Right (verify with cat -v)
 
