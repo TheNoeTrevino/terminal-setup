@@ -1,0 +1,34 @@
+# Herdr plugin manifest for fzf-git.sh.
+#
+# Herdr has no CLI command that opens a popup directly. The API method list
+# carries popup.close and no popup open. A popup comes from exactly two places:
+# a [[keys.command]] binding with type = "popup" in config.toml, or a plugin
+# pane declared with placement = "popup". Only the second one can start from a
+# shell command, so only the second one keeps the ^G chords working.
+#
+# Register this file once:
+#   herdr plugin link ~/terminal-setup/fzf-git.sh
+#
+# fzf-git.sh then opens each picker with:
+#   herdr plugin pane open --plugin local.fzf-git --entrypoint picker ...
+
+id = "local.fzf-git"
+name = "fzf-git"
+version = "0.1.0"
+min_herdr_version = "0.7.0"
+description = "Herdr popup pickers for fzf-git.sh"
+platforms = ["linux", "macos"]
+
+[[panes]]
+id = "picker"
+title = "fzf-git"
+placement = "popup"
+width = "80%"
+height = "60%"
+
+# The command runs through PATH when it has no slash, and resolves against the
+# pane cwd when it does. The cwd here is the caller's git repository, not this
+# directory, so neither form can find the script. fzf-git.sh passes its own
+# absolute path in FZF_GIT_SCRIPT instead, which also keeps this file free of a
+# hard-coded home directory. bash is explicit because fzf-git.sh has no shebang.
+command = ["/bin/sh", "-c", "exec bash \"$FZF_GIT_SCRIPT\" popup"]

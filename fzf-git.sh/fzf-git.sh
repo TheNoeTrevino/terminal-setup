@@ -53,6 +53,19 @@ __fzf_git_cat() {
 __fzf_git_pager() {
   local pager
   pager="${FZF_GIT_PAGER:-${GIT_PAGER:-$(git config --get core.pager 2>/dev/null)}}"
+
+  # delta reads its width from the terminal, but a preview command writes to a
+  # pipe, so it finds no terminal and falls back to 80 columns. That leaves its
+  # rules and headers short of the pane edge. fzf exports the real width as
+  # FZF_PREVIEW_COLUMNS, so hand delta that instead.
+  #
+  # FZF_PREVIEW_COLUMNS stays unexpanded here on purpose. This function runs
+  # while the picker is being built, and the value only exists later, in the
+  # shell fzf spawns for each preview.
+  case "$pager" in
+    delta|delta\ *) echo "$pager --width=\${FZF_PREVIEW_COLUMNS:-\$COLUMNS}"; return ;;
+  esac
+
   echo "${pager:-cat}"
 }
 
@@ -95,6 +108,10 @@ if [[ $# -eq 1 ]]; then
       refs 'cat'
       ;;
     nobeep) ;;
+    # Runs inside a herdr popup pane. The picker functions live in the
+    # interactive block below, so this case only has to avoid the exit 1 and
+    # let execution fall through to it. See _fzf_git_popup_main.
+    popup) ;;
     *) exit 1 ;;
   esac
 elif [[ $# -gt 1 ]]; then
@@ -144,23 +161,47 @@ elif [[ $# -gt 1 ]]; then
   exit 0
 fi
 
-if [[ $- =~ i ]]; then
+# The popup pane runs this file as `fzf-git.sh popup`, which is not an
+# interactive shell. It still needs every picker function below, so it opens
+# this block too.
+if [[ $- =~ i ]] || [[ ${1:-} == popup ]]; then
 # -----------------------------------------------------------------------------
+
+# Herdr plugin that owns the popup pane, declared in herdr-plugin.toml.
+# Register it once with: herdr plugin link <this directory>
+: "${FZF_GIT_HERDR_PLUGIN:=local.fzf-git}"
 
 # Redefine this function to change the options
 _fzf_git_fzf() {
-  fzf-tmux -p80%,60% -- \
-    --layout=reverse --multi --height=50% --min-height=20 --border \
-    --border-label-pos=2 \
-    --color='header:italic:underline,label:blue' \
-    --preview-window='right,50%,border-left' \
-    --bind='ctrl-/:change-preview-window(down,50%,border-top|hidden|)' "$@"
+  # Inside a herdr popup the pane is already the right size, so fzf takes all
+  # of it. fzf-tmux is only useful under tmux; outside it, it just runs fzf.
+  if [[ -n ${FZF_GIT_CALLER:-} ]]; then
+    fzf --layout=reverse --multi --height=100% --min-height=20 --border \
+      --border-label-pos=2 \
+      --color='header:italic:underline,label:blue' \
+      --preview-window='right,66%,border-left' \
+      --bind='ctrl-/:change-preview-window(down,50%,border-top|hidden|)' "$@"
+  else
+    fzf-tmux -p80%,60% -- \
+      --layout=reverse --multi --height=50% --min-height=20 --border \
+      --border-label-pos=2 \
+      --color='header:italic:underline,label:blue' \
+      --preview-window='right,66%,border-left' \
+      --bind='ctrl-/:change-preview-window(down,50%,border-top|hidden|)' "$@"
+  fi
 }
 
 _fzf_git_check() {
   git rev-parse HEAD > /dev/null 2>&1 && return
 
-  [[ -n $TMUX ]] && tmux display-message "Not in a git repository"
+  # herdr notification show prints its JSON reply on stdout, and a zle widget
+  # captures this function's stdout. The redirect keeps that reply off the
+  # command line.
+  if [[ ${HERDR_ENV:-} == 1 ]] && command -v herdr > /dev/null; then
+    herdr notification show "Not in a git repository" > /dev/null 2>&1
+  elif [[ -n $TMUX ]]; then
+    tmux display-message "Not in a git repository"
+  fi
   return 1
 }
 
@@ -288,7 +329,78 @@ _fzf_git_worktrees() {
   awk '{print $1}'
 }
 
+# --- herdr popup route -------------------------------------------------------
+#
+# tmux draws the picker in a popup through fzf-tmux. Herdr has no equivalent
+# that a shell can call, so the picker runs in a herdr plugin pane declared as
+# placement = "popup" in herdr-plugin.toml.
+#
+# The popup is a separate process. It cannot return the selection on stdout the
+# way the inline picker does, so it types the selection into the calling pane
+# with `herdr pane send-text`. FZF_GIT_CALLER carries that pane id, because
+# herdr does not set HERDR_PANE_ID inside a plugin pane.
+#
+# Returns 0 when herdr took the request. Returns non-zero when the caller must
+# fall back to the inline picker, which covers every case: no herdr, no plugin
+# linked, or a herdr version without plugin panes.
+_fzf_git_herdr_popup() {
+  [[ ${HERDR_ENV:-} == 1 ]] || return 1
+  [[ -n ${HERDR_PANE_ID:-} ]] || return 1
+  command -v herdr > /dev/null 2>&1 || return 1
+
+  # The popup is a child of the herdr server, not of this shell, so it inherits
+  # the server's environment and none of the shell's exports. Forward every
+  # variable that fzf and this file read. Without this the popup picker ignores
+  # settings the inline picker obeys, such as FZF_DEFAULT_OPTS.
+  local v val
+  local -a envopts
+  envopts=()
+  for v in NO_COLOR EDITOR BAT_STYLE GIT_PAGER \
+           FZF_GIT_COLOR FZF_GIT_PREVIEW_COLOR FZF_GIT_CAT FZF_GIT_PAGER \
+           FZF_DEFAULT_OPTS FZF_DEFAULT_COMMAND FZF_DEFAULT_OPTS_FILE; do
+    # ${!v} is bash-only and ${(P)v} is zsh-only, so read the name through eval.
+    eval "val=\${$v:-}"
+    [[ -n $val ]] && envopts+=(--env "$v=$val")
+  done
+
+  herdr plugin pane open \
+    --plugin "$FZF_GIT_HERDR_PLUGIN" \
+    --entrypoint picker \
+    "${envopts[@]}" \
+    --env "FZF_GIT_SCRIPT=$__fzf_git" \
+    --env "FZF_GIT_KIND=$1" \
+    --env "FZF_GIT_CALLER=$HERDR_PANE_ID" \
+    --cwd "$PWD" > /dev/null 2>&1
+}
+
+# The body of the popup pane. FZF_GIT_KIND names the picker to run and
+# FZF_GIT_CALLER names the pane that asked for it.
+_fzf_git_popup_main() {
+  local result item joined=
+
+  result=$("_fzf_git_${FZF_GIT_KIND:-files}") || return
+  [[ -n $result ]] || return
+
+  # Quote each item the way the zsh widget does, so that a path with a space in
+  # it arrives on the command line as one argument.
+  while IFS= read -r item; do
+    [[ -n $item ]] || continue
+    joined+="$(printf '%q' "$item") "
+  done <<< "$result"
+
+  [[ -n $joined ]] || return
+  herdr pane send-text "$FZF_GIT_CALLER" "$joined" > /dev/null 2>&1
+}
+
 if [[ -n "${BASH_VERSION:-}" ]]; then
+  # A readline macro inserts whatever this prints. The herdr popup route prints
+  # nothing, because the popup types the selection in on its own later.
+  _fzf_git_widget() {
+    _fzf_git_check || return
+    _fzf_git_herdr_popup "$1" && return
+    "_fzf_git_$1"
+  }
+
   __fzf_git_init() {
     bind -m emacs-standard '"\er":  redraw-current-line'
     bind -m emacs-standard '"\C-z": vi-editing-mode'
@@ -298,10 +410,10 @@ if [[ -n "${BASH_VERSION:-}" ]]; then
     local o c
     for o in "$@"; do
       c=${o:0:1}
-      bind -m emacs-standard '"\C-g\C-'$c'": " \C-u \C-a\C-k`_fzf_git_'$o'`\e\C-e\C-y\C-a\C-y\ey\C-h\C-e\er \C-h"'
+      bind -m emacs-standard '"\C-g\C-'$c'": " \C-u \C-a\C-k`_fzf_git_widget '$o'`\e\C-e\C-y\C-a\C-y\ey\C-h\C-e\er \C-h"'
       bind -m vi-command     '"\C-g\C-'$c'": "\C-z\C-g\C-'$c'\C-z"'
       bind -m vi-insert      '"\C-g\C-'$c'": "\C-z\C-g\C-'$c'\C-z"'
-      bind -m emacs-standard '"\C-g'$c'":    " \C-u \C-a\C-k`_fzf_git_'$o'`\e\C-e\C-y\C-a\C-y\ey\C-h\C-e\er \C-h"'
+      bind -m emacs-standard '"\C-g'$c'":    " \C-u \C-a\C-k`_fzf_git_widget '$o'`\e\C-e\C-y\C-a\C-y\ey\C-h\C-e\er \C-h"'
       bind -m vi-command     '"\C-g'$c'":    "\C-z\C-g'$c'\C-z"'
       bind -m vi-insert      '"\C-g'$c'":    "\C-z\C-g'$c'\C-z"'
     done
@@ -317,7 +429,22 @@ elif [[ -n "${ZSH_VERSION:-}" ]]; then
   __fzf_git_init() {
     local m o
     for o in "$@"; do
-      eval "fzf-git-$o-widget() { local result=\$(_fzf_git_$o | __fzf_git_join); zle reset-prompt; LBUFFER+=\$result }"
+      # The herdr branch returns before LBUFFER is touched. The popup types the
+      # selection in as terminal input after this widget has already finished,
+      # so zle reads it as ordinary keystrokes. In vicmd those keystrokes run
+      # as vi commands instead of arriving on the line, so leave vicmd first.
+      # emacs and viins already insert, and both keep their keymap.
+      eval "fzf-git-$o-widget() {
+        _fzf_git_check || { zle reset-prompt; return; }
+        if _fzf_git_herdr_popup $o; then
+          [[ \$KEYMAP == vicmd ]] && zle -K viins
+          zle reset-prompt
+          return
+        fi
+        local result=\$(_fzf_git_$o | __fzf_git_join)
+        zle reset-prompt
+        LBUFFER+=\$result
+      }"
       eval "zle -N fzf-git-$o-widget"
       for m in emacs vicmd viins; do
         eval "bindkey -M $m '^g^${o[1]}' fzf-git-$o-widget"
@@ -326,7 +453,14 @@ elif [[ -n "${ZSH_VERSION:-}" ]]; then
     done
   }
 fi
-__fzf_git_init files branches tags remotes hashes stashes lreflogs each_ref worktrees
+
+# A popup pane runs the picker once and exits. An interactive shell binds the
+# ^G chords instead.
+if [[ ${1:-} == popup ]]; then
+  _fzf_git_popup_main
+else
+  __fzf_git_init files branches tags remotes hashes stashes lreflogs each_ref worktrees
+fi
 
 # -----------------------------------------------------------------------------
 fi
