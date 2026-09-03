@@ -1,8 +1,8 @@
 # ---------------------------------------------------------------------------
-# Television (tv) is the fuzzy finder (migrated from fzf).
-#   - Channels (source + preview + actions) live in ~/.config/television/cable/*.toml
-#   - UI, keybindings and shell triggers live in ~/.config/television/config.toml
-# fzf is still installed as a fallback but nothing here depends on it.
+# fzf is the fuzzy finder for everything in this file.
+#   - Shell integration (^T files, ^R history, Alt-C cd) comes from `fzf --zsh`
+#   - Git pickers (^G chords) come from fzf-git.sh, sourced further down
+#   - fd builds the file lists; bat renders the previews
 # ---------------------------------------------------------------------------
 
 # claude code options
@@ -12,76 +12,63 @@ export EDITOR='nvim'
 
 # ---- Command history ----
 # zsh ships with no HISTFILE and SAVEHIST=0, so history was in-memory only and
-# capped at 30 lines -- every new terminal started blank. tv's ^R widget reads
-# the *in-memory* list (`history -n -1 0`), so persistence has to happen here,
-# not in tv's config.
+# capped at 30 lines -- every new terminal started blank. fzf's ^R widget reads
+# the *in-memory* list (`fc -rl 1`), so persistence has to happen here.
 HISTFILE="$HOME/.zsh_history"
-HISTSIZE=100000   # lines kept in memory (what ^R searches)
-SAVEHIST=100000   # lines written to HISTFILE
+HISTSIZE=100000 # lines kept in memory (what ^R searches)
+SAVEHIST=100000 # lines written to HISTFILE
 
 # share_history: write each command out immediately AND pull in commands other
 # live sessions have written, so ^R in one terminal sees what you typed in
-# another. Implies append_history, inc_append_history and extended_history.
+# another. It sets append_history and subsumes inc_append_history, so neither
+# needs setting here. Anything below that re-sets these will silently win, so
+# keep history config in this one block.
 setopt share_history
-setopt extended_history      # record timestamp + duration per entry
-setopt hist_ignore_all_dups  # drop the older copy when a command repeats
-setopt hist_ignore_space     # leading space keeps a command out of history
-setopt hist_reduce_blanks    # tidy up whitespace before storing
-setopt hist_verify           # expansions land on the line for review, not run
+setopt extended_history     # record timestamp + duration per entry
+setopt hist_ignore_all_dups # drop the older copy when a command repeats
+setopt hist_ignore_space    # leading space keeps a command out of history
+setopt hist_reduce_blanks   # tidy up whitespace before storing
+setopt hist_verify          # expansions land on the line for review, not run
 
-# Initialize zsh's completion system. tv's init script registers a completion
-# (`compdef _tv tv`), which requires compinit to have run first -- otherwise
-# sourcing prints "command not found: compdef". (fzf's script guarded this; tv's
-# does not.) compinit also backs the `completion` autosuggest strategy below.
+# Initialize zsh's completion system. This has to run BEFORE fzf's integration:
+# fzf's completion.zsh reads whatever is currently bound to <Tab> and reuses it
+# as its own fallback, so compinit must have claimed <Tab> first. compinit also
+# backs the `completion` autosuggest strategy set in .zshrc.
 autoload -Uz compinit && compinit
 
-# Shell integration: binds ^T (smart path/argument autocomplete) and ^R
-# (command history) -- the television equivalents of fzf's ^T / ^R. Which
-# channel a given command opens (e.g. `git checkout` + ^T -> git-branch) is
-# configured under [shell_integration] in config.toml.
-_tv_cache="${XDG_CACHE_HOME:-$HOME/.cache}/tv_init.zsh"
-if [[ ! -f "$_tv_cache" || $(which tv) -nt "$_tv_cache" ]]; then
-  tv init zsh >|"$_tv_cache"
+# ---- fzf sources and previews ----
+# fd replaces find: it honours .gitignore, and --hidden with --exclude .git
+# picks up dotfiles without the .git object noise.
+export FZF_DEFAULT_COMMAND="fd --hidden --strip-cwd-prefix --exclude .git"
+export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+export FZF_ALT_C_COMMAND="fd --type=d --hidden --strip-cwd-prefix --exclude .git"
+
+# ctrl-k moves down and ctrl-l moves up in every fzf picker.
+export FZF_DEFAULT_OPTS='--bind ctrl-k:down,ctrl-l:up'
+export FZF_CTRL_T_OPTS="--preview 'bat -n --color=always --line-range :500 {}'"
+
+# Path and directory sources for fzf's `**<Tab>` completion trigger.
+_fzf_compgen_path() {
+  fd --hidden --exclude .git . "$1"
+}
+_fzf_compgen_dir() {
+  fd --type=d --hidden --exclude .git . "$1"
+}
+
+# Shell integration: binds ^T (insert a file path), ^R (command history) and
+# Alt-C (cd into a subdirectory), each in the emacs, viins and vicmd keymaps.
+# It also binds <Tab> to `fzf-completion`, which only takes over after the `**`
+# trigger -- a plain <Tab> still runs the zsh completion compinit installed.
+_fzf_cache="${XDG_CACHE_HOME:-$HOME/.cache}/fzf_init.zsh"
+if [[ ! -f "$_fzf_cache" || $(which fzf) -nt "$_fzf_cache" ]]; then
+  fzf --zsh >|"$_fzf_cache"
 fi
-source "$_tv_cache"
-unset _tv_cache
+source "$_fzf_cache"
+unset _fzf_cache
 
-# tv's smart-autocomplete widget, on an EMPTY line, falls back to zsh's default
-# completion -- the "do you wish to see all 4290 possibilities" dump. We want an
-# empty line to open tv instead.
-#
-# This used to be done with `fzf_default_completion=_tv_open`, but that variable
-# is GLOBAL: fzf's completion.zsh (which binds <Tab> to `fzf-completion`) reads
-# the same variable as its fallback. On any machine where fzf's shell
-# integration is loaded, that made <Tab> open tv. We now scope the behaviour to
-# our own wrapper widget below and leave <Tab> as plain zsh completion.
-_tv_open() {
-  local result
-  result=$(tv </dev/tty)
-  [[ -n "$result" ]] && LBUFFER="${LBUFFER}${result}"
-  typeset -f _enable_bracketed_paste >/dev/null && _enable_bracketed_paste
-  zle reset-prompt
-}
-zle -N _tv_open
-
-# Empty line -> open tv outright; otherwise run tv's context-aware smart
-# autocomplete (e.g. `git checkout ` -> branches).
-_tv_smart_or_open() {
-  if [[ -z "${LBUFFER//[[:space:]]/}" ]]; then
-    _tv_open
-  else
-    zle tv-smart-autocomplete
-  fi
-}
-zle -N _tv_smart_or_open
-
-# Ctrl-F / Ctrl-T trigger smart autocomplete. Bound in viins/vicmd since the
-# shell runs in vi mode (bindkey -v in .zshrc). <Tab> is intentionally left
-# untouched so it keeps doing normal zsh completion.
-bindkey -M viins '^F' _tv_smart_or_open
-bindkey -M vicmd '^F' _tv_smart_or_open
-bindkey -M viins '^T' _tv_smart_or_open
-bindkey -M vicmd '^T' _tv_smart_or_open
+# ^F is a second key for the file widget, for muscle memory.
+bindkey -M viins '^F' fzf-file-widget
+bindkey -M vicmd '^F' fzf-file-widget
 
 _starship_cache="${XDG_CACHE_HOME:-$HOME/.cache}/starship_init.zsh"
 if [[ ! -f "$_starship_cache" || $(which starship) -nt "$_starship_cache" ]]; then
@@ -109,12 +96,14 @@ ialias() {
 ialias ls="eza --icons=always --color=always --long  --no-filesize --no-time --no-user --no-permissions"
 
 # ---- Fuzzy-find a file and open it in nvim ----
-# Was: fd | fzf-tmux --preview 'bat ...' | xargs nvim
-# The `files` channel already previews with bat and uses the fd source defined
-# in files.toml (hidden, excludes .git). Tab multi-selects; each opens in nvim.
+# Tab multi-selects; every selected file opens in the same nvim.
+# --tmux draws the picker in a tmux popup when we are inside tmux. fzf ignores
+# it outside tmux, where --height takes over instead.
 v() {
   local files
-  files=$(tv files) || return
+  files=$(fd --type f --hidden --exclude .git |
+    fzf --multi --tmux center,80%,60% --height 60% --border --layout=reverse \
+      --preview 'bat --style=numbers --color=always --line-range :500 {}') || return
   [[ -n "$files" ]] && print -rl -- "$files" | xargs -ro nvim
 }
 
@@ -129,11 +118,17 @@ update() {
 }
 
 # ---- TMUX ----
-# Was: fzf-tmux with `sesh preview` (sesh isn't installed -> preview was broken).
-# The tmux-sessions channel previews with `tmux capture-pane`, no sesh needed.
+# `tmux capture-pane` previews the session's current pane, so there is no
+# dependency on sesh (which isn't installed).
+_tmux_pick_session() {
+  tmux ls -F '#{session_name}' 2>/dev/null |
+    fzf --tmux center,80%,60% --height 40% --border --layout=reverse \
+      --preview 'tmux capture-pane -ep -t {}'
+}
+
 tmux-list() {
   local session
-  session=$(tv tmux-sessions) || return
+  session=$(_tmux_pick_session) || return
   [[ -n "$session" ]] || return
   if [[ -n "$TMUX" ]]; then
     tmux switch-client -t "$session"
@@ -144,7 +139,7 @@ tmux-list() {
 
 tmux-kill() {
   local session
-  session=$(tv tmux-sessions) || return
+  session=$(_tmux_pick_session) || return
   [[ -n "$session" ]] && tmux kill-session -t "$session"
 }
 
@@ -168,38 +163,43 @@ ialias g='git'
 ialias n='clear && neofetch'
 
 # ---- Git pickers: fzf-git.sh (Ctrl-G chords) ----
-# tv is the fuzzy finder for everything EXCEPT git. For git we use junegunn's
-# fzf-git.sh: each Ctrl-G chord opens an fzf picker and inserts the selected
-# object at the cursor. It only binds ^G (in viins/vicmd), so tv's ^T/^R/^F and
-# all other pickers are untouched. Needs the `fzf` binary (installed).
+# junegunn's fzf-git.sh: each Ctrl-G chord opens an fzf picker and inserts the
+# selected object at the cursor. It only binds the two-key ^G chords (in
+# viins/vicmd), so ^T/^R/^F and the other pickers here are untouched.
 #   ^G^F files    ^G^B branches  ^G^T tags      ^G^R remotes    ^G^H hashes
 #   ^G^S stashes  ^G^L reflogs   ^G^E each-ref  ^G^W worktrees   (^G^? lists all)
 source ~/terminal-setup/fzf-git.sh/fzf-git.sh
 
 # ---- Process picker ----
-# Was: sps() { ps -ef | fzf ... } bound to ^P.
-# The procs channel can act on the selection: F3=kill, F2=term, ctrl-s=stop,
-# ctrl-c=cont. `sps` kept as an alias for muscle memory.
-ialias sps='tv procs'
-_tv_procs_widget() {
-  tv procs >/dev/null
+# ctrl-r refreshes the list. f2 sends TERM to the highlighted process and f3
+# sends KILL; both refresh afterwards. Field 2 of `ps -ef` is the PID.
+sps() {
+  ps -ef | fzf --header-lines=1 --height=50% --layout=reverse --border \
+    --header 'ctrl-r reload | f2 term | f3 kill' \
+    --bind 'ctrl-r:reload(ps -ef)' \
+    --bind 'f2:execute-silent(kill -TERM {2})+reload(ps -ef)' \
+    --bind 'f3:execute-silent(kill -KILL {2})+reload(ps -ef)'
+}
+
+_fzf_procs_widget() {
+  sps >/dev/null
   zle reset-prompt
 }
-zle -N _tv_procs_widget
+zle -N _fzf_procs_widget
 
-_tv_fg_widget() { fg; }
-zle -N _tv_fg_widget
+_fg_widget() { fg; }
+zle -N _fg_widget
 
 # ---- Jobs picker ----
-# Was: jobs | fzf. `jobs | tv` builds an ad-hoc channel straight from stdin.
 fjob() {
   local job
-  job=$(jobs | tv | awk '{print $1}' | tr -d '[]')
+  job=$(jobs | fzf --height=40% --layout=reverse --border |
+    awk '{print $1}' | tr -d '[]')
   [[ -n "$job" ]] && fg "%$job"
 }
 
-bindkey '^P' _tv_procs_widget
-bindkey '^Z' _tv_fg_widget
+bindkey '^P' _fzf_procs_widget
+bindkey '^Z' _fg_widget
 
 bindkey -M viins '^[[1;5D' backward-word # Alt+Left
 bindkey -M viins '^[[1;5C' forward-word  # Alt+Right (verify with cat -v)
@@ -208,11 +208,11 @@ ialias claude='claude --dangerously-skip-permissions'
 
 # ---- Reload config ----
 # Use this instead of `source ~/.zshrc`. Re-sourcing re-runs compinit + re-binds
-# ^T/^R/^F/^P *while the line editor is live*; during that ~0.8s window stray
-# terminal input lands on the freshly-rebound keys and fires tv pickers (which
-# then open $EDITOR via their f12 action). `exec zsh` replaces the shell so the
-# config loads cleanly before zle is interactive, and picks up all changes.
+# ^T/^R/^F/^P *while the line editor is live*; during that window stray terminal
+# input lands on the freshly-rebound keys and fires the pickers. `exec zsh`
+# replaces the shell so the config loads cleanly before zle is interactive, and
+# picks up all changes.
 ialias reload='exec zsh'
 
 # remove lag from going into vi mode in shell
-export KEYTIMEOUT=15
+export KEYTIMEOUT=45
