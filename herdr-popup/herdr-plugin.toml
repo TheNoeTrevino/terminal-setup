@@ -1,0 +1,37 @@
+# A generic herdr popup launcher.
+#
+# Herdr has no CLI command that opens a popup. A popup comes from a key binding
+# in config.toml, or from a plugin pane declared with placement = "popup". Only
+# the second one starts from a shell command, so it is the only route that lets
+# an existing shell function keep its own keybinding.
+#
+# This plugin declares one entrypoint that runs whatever script the caller names
+# in HERDR_POPUP_SCRIPT. That keeps the popup mechanism in one place, so a new
+# picker needs a script and nothing else here.
+#
+# Register it once:
+#   herdr plugin link ~/terminal-setup/herdr-popup
+#
+# Open a popup with the herdr-popup helper in options.sh, which fills in the
+# script path, the caller pane id, and the environment the popup cannot inherit.
+
+id = "local.popup"
+name = "popup"
+version = "0.1.0"
+min_herdr_version = "0.7.0"
+description = "Run a script in a herdr popup"
+platforms = ["linux", "macos"]
+
+[[panes]]
+id = "script"
+title = "popup"
+placement = "popup"
+# herdr plugin pane open has no size flags, so the size lives here. Add a second
+# entrypoint if a picker ever needs different dimensions.
+width = "80%"
+height = "60%"
+
+# A command with no slash resolves through PATH, and one with a slash resolves
+# against the pane cwd. Neither can find a script here, because the cwd is the
+# caller's directory. So the caller passes an absolute path in the environment.
+command = ["/bin/sh", "-c", "exec \"$HERDR_POPUP_SCRIPT\""]

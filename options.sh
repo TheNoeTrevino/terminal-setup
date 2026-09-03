@@ -95,16 +95,46 @@ ialias() {
 # ---- Eza (better ls) -----
 ialias ls="eza --icons=always --color=always --long  --no-filesize --no-time --no-user --no-permissions"
 
+# ---- Run a picker in a herdr popup ----
+# Same idea as the ^G chords from fzf-git.sh: inside herdr the picker floats in
+# a popup, and everywhere else it draws inline. The plugin that owns the popup
+# is ~/terminal-setup/herdr-popup, registered once with:
+#   herdr plugin link ~/terminal-setup/herdr-popup
+#
+# Returns 0 when herdr took the request, so the caller stops. Returns non-zero
+# when the caller must run the picker inline instead. That covers every case:
+# no herdr, plugin not linked, or a herdr too old for plugin panes.
+herdr-popup() {
+  [[ ${HERDR_ENV:-} == 1 ]] || return 1
+  [[ -n ${HERDR_PANE_ID:-} ]] || return 1
+  command -v herdr > /dev/null 2>&1 || return 1
+  [[ -x $1 ]] || return 1
+
+  # The popup is a child of the herdr server, not of this shell, so it inherits
+  # the server's environment and none of these exports. Forward them by hand or
+  # the popup ignores settings that work everywhere else.
+  local v val
+  local -a envopts
+  envopts=()
+  for v in NO_COLOR EDITOR PAGER BAT_STYLE BAT_THEME \
+           FZF_DEFAULT_OPTS FZF_DEFAULT_COMMAND FZF_DEFAULT_OPTS_FILE; do
+    eval "val=\${$v:-}"
+    [[ -n $val ]] && envopts+=(--env "$v=$val")
+  done
+
+  herdr plugin pane open --plugin local.popup --entrypoint script \
+    "${envopts[@]}" \
+    --env "HERDR_POPUP_SCRIPT=$1" \
+    --env "HERDR_POPUP_CALLER=$HERDR_PANE_ID" \
+    --cwd "$PWD" > /dev/null 2>&1
+}
+
 # ---- Fuzzy-find a file and open it in nvim ----
-# Tab multi-selects; every selected file opens in the same nvim.
-# --tmux draws the picker in a tmux popup when we are inside tmux. fzf ignores
-# it outside tmux, where --height takes over instead.
+# The picker itself lives in pickers/v.zsh, so the popup and the inline path
+# share one copy. Inside herdr it floats; everywhere else it draws inline.
 v() {
-  local files
-  files=$(fd --type f --hidden --exclude .git |
-    fzf --multi --tmux center,80%,60% --height 60% --border --layout=reverse \
-      --preview 'bat --style=numbers --color=always --line-range :500 {}') || return
-  [[ -n "$files" ]] && print -rl -- "$files" | xargs -ro nvim
+  herdr-popup ~/terminal-setup/pickers/v.zsh && return
+  ~/terminal-setup/pickers/v.zsh
 }
 
 update() {
