@@ -107,7 +107,7 @@ ialias ls="eza --icons=always --color=always --long  --no-filesize --no-time --n
 herdr-popup() {
   [[ ${HERDR_ENV:-} == 1 ]] || return 1
   [[ -n ${HERDR_PANE_ID:-} ]] || return 1
-  command -v herdr > /dev/null 2>&1 || return 1
+  command -v herdr >/dev/null 2>&1 || return 1
   [[ -x $1 ]] || return 1
 
   # The popup is a child of the herdr server, not of this shell, so it inherits
@@ -117,7 +117,7 @@ herdr-popup() {
   local -a envopts
   envopts=()
   for v in NO_COLOR EDITOR PAGER BAT_STYLE BAT_THEME \
-           FZF_DEFAULT_OPTS FZF_DEFAULT_COMMAND FZF_DEFAULT_OPTS_FILE; do
+    FZF_DEFAULT_OPTS FZF_DEFAULT_COMMAND FZF_DEFAULT_OPTS_FILE; do
     eval "val=\${$v:-}"
     [[ -n $val ]] && envopts+=(--env "$v=$val")
   done
@@ -126,7 +126,7 @@ herdr-popup() {
     "${envopts[@]}" \
     --env "HERDR_POPUP_SCRIPT=$1" \
     --env "HERDR_POPUP_CALLER=$HERDR_PANE_ID" \
-    --cwd "$PWD" > /dev/null 2>&1
+    --cwd "$PWD" >/dev/null 2>&1
 }
 
 # ---- Fuzzy-find a file and open it in nvim ----
@@ -198,6 +198,8 @@ ialias n='clear && neofetch'
 # viins/vicmd), so ^T/^R/^F and the other pickers here are untouched.
 #   ^G^F files    ^G^B branches  ^G^T tags      ^G^R remotes    ^G^H hashes
 #   ^G^S stashes  ^G^L reflogs   ^G^E each-ref  ^G^W worktrees   (^G^? lists all)
+export SUDO_EDITOR="nvim"
+
 source ~/terminal-setup/fzf-git.sh/fzf-git.sh
 
 # ---- Process picker ----
