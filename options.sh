@@ -8,7 +8,8 @@
 # claude code options
 export CLAUDE_CODE_NO_FLICKER=1
 
-export EDITOR='nvim'
+export EDITOR='vim'
+export SUDO_EDITOR='vim'
 
 # ---- Command history ----
 # zsh ships with no HISTFILE and SAVEHIST=0, so history was in-memory only and
