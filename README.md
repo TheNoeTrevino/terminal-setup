@@ -66,13 +66,13 @@ Key bindings:
 
 Each takes `^G b` or `^G ^B`. The full set:
 
-| Chord | Picker | Chord | Picker |
-|---|---|---|---|
-| `^G f` | Files | `^G s` | Stashes |
-| `^G b` | Branches | `^G l` | Reflogs |
-| `^G t` | Tags | `^G e` | Each ref |
-| `^G r` | Remotes | `^G w` | Worktrees |
-| `^G h` | Hashes | | |
+| Chord  | Picker   | Chord  | Picker    |
+| ------ | -------- | ------ | --------- |
+| `^G f` | Files    | `^G s` | Stashes   |
+| `^G b` | Branches | `^G l` | Reflogs   |
+| `^G t` | Tags     | `^G e` | Each ref  |
+| `^G r` | Remotes  | `^G w` | Worktrees |
+| `^G h` | Hashes   |        |           |
 
 Inside a picker: `CTRL-O` opens in a browser, `ALT-A` widens the list,
 `ALT-E` opens in `$EDITOR`, `CTRL-/` moves the preview, and `TAB`
@@ -109,11 +109,11 @@ one copy of the picker serves both the popup and the inline path.
 
 See `options.sh`.
 
-| Command | Does |
-|---|---|
-| `v` | Find a file, open it in nvim. Popup inside herdr. |
-| `t` / `tmux-list` | Attach to a tmux session. |
-| `tmux-kill` | Kill a tmux session. |
-| `sps` | Process picker. |
-| `fjob` | Jobs picker. |
-| `reload` | Restart the shell with the new config. |
+| Command           | Does                                              |
+| ----------------- | ------------------------------------------------- |
+| `v`               | Find a file, open it in nvim. Popup inside herdr. |
+| `t` / `tmux-list` | Attach to a tmux session.                         |
+| `tmux-kill`       | Kill a tmux session.                              |
+| `sps`             | Process picker.                                   |
+| `fjob`            | Jobs picker.                                      |
+| `reload`          | Restart the shell with the new config.            |

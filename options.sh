@@ -247,5 +247,6 @@ ialias claude='claude --dangerously-skip-permissions'
 # picks up all changes.
 ialias reload='exec zsh'
 
+bruq() { (cd ~/projects/icris/bruno && bru run "$@" --env dev --sandbox developer); }
 # remove lag from going into vi mode in shell
 export KEYTIMEOUT=45
